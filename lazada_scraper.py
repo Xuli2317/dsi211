@@ -6,7 +6,7 @@ from selenium.webdriver.chrome.service import Service
 import time
 import csv
 
-# ตั้งค่า Chrome ให้เด้งเปิด
+# ตั้งค่า Chrome
 options = Options()
 options.add_argument('--start-maximized')
 
@@ -16,61 +16,53 @@ driver = webdriver.Chrome(service=service, options=options)
 data = []
 
 try:
-    # เปิด Lazada แล้ว search โยเกิร์ต
     driver.get("https://www.lazada.co.th/")
     time.sleep(2)
+
     search = driver.find_element(By.CSS_SELECTOR, 'input[name="q"]')
     search.send_keys("โยเกิร์ต")
     search.submit()
     time.sleep(5)
-    print("🔍 ทำการค้นหาคำว่า 'โยเกิร์ต'")
+    print("🔍 ค้นหาคำว่า 'โยเกิร์ต'")
 
-    # Scroll the page to load more results
-    for _ in range(5):  # Scroll 5 times to load more products
-        driver.execute_script("window.scrollBy(0, 1000);")
+    # Scroll เพื่อโหลดสินค้าทั้งหมด
+    for _ in range(3):
+        driver.execute_script("window.scrollBy(0, 1500);")
         time.sleep(2)
 
-    # ดึงทุกการ์ดสินค้าจากผลลัพธ์
+    # ดึงรายการการ์ดสินค้า
     cards = driver.find_elements(By.CSS_SELECTOR, 'div[data-qa-locator="product-item"]')
-    print(f"พบ {len(cards)} การ์ดสินค้า")
+    print(f"📦 พบสินค้าทั้งหมด {len(cards)} รายการ")
 
-    # Process only the first 10 cards
-    for index, card in enumerate(cards[:10], 1):
+    # เก็บลิงก์สินค้า
+    product_links = []
+    for card in cards:
         try:
-            print(f"\n🔑 กำลังดึงข้อมูลจากการ์ดที่ {index} ...")
+            link = card.find_element(By.CSS_SELECTOR, 'div.RfADt a').get_attribute('href')
+            product_links.append(link)
+        except:
+            continue
 
-            # ชื่อสินค้า: tag <a> ใน div.RfADt
-            title = card.find_element(By.CSS_SELECTOR, 'div.RfADt a').get_attribute('title').strip()
+    print(f"🔗 เก็บลิงก์สำเร็จ {len(product_links)} รายการ")
 
-            # ราคา: span.ooOxS
-            price = card.find_element(By.CSS_SELECTOR, 'span.ooOxS').text.strip()
+    # เข้าแต่ละลิงก์เพื่อดึงข้อมูล
+    for index, link in enumerate(product_links, 1):
+        try:
+            driver.get(link)
+            print(f"\n➡️ [{index}] เข้าไปยัง: {link}")
+            time.sleep(3)
 
-            # จำนวนยอดขาย: span ใน div._6uN7R > span._1cEkb > span
+            title = driver.find_element(By.CSS_SELECTOR, 'h1.pdp-mod-product-badge-title').text.strip()
+            price = driver.find_element(By.CSS_SELECTOR, 'span.pdp-price.pdp-price_type_normal').text.strip()
+
             try:
-                sales = card.find_element(By.CSS_SELECTOR, 'div._6uN7R span._1cEkb span').text.strip()
+                sales = driver.find_element(By.CSS_SELECTOR, 'div.pdp-product-highlights span').text.strip()
             except:
                 sales = "ไม่พบยอดขาย"
 
-            # เพิ่มข้อมูลลงใน list
             data.append([title, price, sales])
-
-            # คลิกที่การ์ดเพื่อเข้าไปดูรายละเอียด (ใช้ลิงค์ใน tag <a>)
-            card_link = card.find_element(By.CSS_SELECTOR, 'div.RfADt a')
-            card_link.click()
-            print(f"🔗 กำลังเข้าไปดูรายละเอียดของสินค้า: {title}")
-
-            # รอโหลดหน้าใหม่
-            time.sleep(3)
-
-            # กลับไปยังหน้าผลลัพธ์ (ย้อนกลับไปยังหน้าหลัก)
-            driver.back()
-            print("⏪ กลับไปยังหน้าผลลัพธ์")
-
-            # รอให้โหลดหน้ากลับมา
-            time.sleep(3)
-
         except Exception as e:
-            print(f"❌ เกิดข้อผิดพลาดในการ์ด {index}: {e}")
+            print(f"❌ ข้อผิดพลาดในลิงก์ที่ {index}: {e}")
 
 finally:
     driver.quit()
@@ -81,4 +73,4 @@ with open('yogurt_data.csv', 'w', newline='', encoding='utf-8-sig') as f:
     writer.writerow(['ชื่อสินค้า', 'ราคา', 'จำนวนยอดขาย'])
     writer.writerows(data)
 
-print(f"✅ บันทึกข้อมูลเรียบร้อย: yogurt_data.csv ({len(data)} รายการ)")
+print(f"\n✅ บันทึกข้อมูลเรียบร้อย: yogurt_data.csv ({len(data)} รายการ)")
